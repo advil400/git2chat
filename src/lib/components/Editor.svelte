@@ -1,24 +1,35 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import FloatingToolbar from './FloatingToolbar.svelte';
-
-  export let value = '';
+  import { ydoc, ytext, provider } from '../socket';
 
   let editorElement: HTMLTextAreaElement;
-  let lines: string[] = [];
+  let value = '';
 
   onMount(() => {
-    if (value) {
-      lines = value.split('\n');
-    } else {
-      lines = [''];
-    }
-    value = lines.join('\n');
-    adjustTextareaHeight();
+    provider.on('sync', (isSynced: boolean) => {
+      if (isSynced) {
+        value = ytext.toString();
+      }
+    });
+
+    ytext.observe(event => {
+      value = ytext.toString();
+      adjustTextareaHeight();
+    });
+  });
+
+  onDestroy(() => {
+    provider.disconnect();
   });
 
   function handleInput() {
-    lines = value.split('\n');
+    const diff = value.length - ytext.length;
+    if (diff > 0) {
+      ytext.insert(ytext.length, value.slice(-diff));
+    } else if (diff < 0) {
+      ytext.delete(ytext.length + diff, -diff);
+    }
     adjustTextareaHeight();
   }
 
@@ -27,10 +38,9 @@
       const cursorPosition = editorElement.selectionStart;
       const currentLineIndex = value.substr(0, cursorPosition).split('\n').length - 1;
       
-      // Ensure there's always an empty line at the end
-      if (currentLineIndex === lines.length - 1 && lines[currentLineIndex].trim() !== '') {
+      if (currentLineIndex === value.split('\n').length - 1 && value.trim() !== '') {
         setTimeout(() => {
-          value += '\n';
+          ytext.insert(cursorPosition, '\n');
           editorElement.setSelectionRange(cursorPosition + 1, cursorPosition + 1);
         }, 0);
       }
@@ -48,7 +58,8 @@
     const selectedText = value.substring(start, end);
     const styledText = style === 'bold' ? `**${selectedText}**` : `*${selectedText}*`;
     
-    value = value.substring(0, start) + styledText + value.substring(end);
+    ytext.delete(start, end - start);
+    ytext.insert(start, styledText);
     
     setTimeout(() => {
       editorElement.focus();
@@ -65,16 +76,6 @@
     a.click();
     URL.revokeObjectURL(url);
   }
-
-  function scrollToLine(index: number) {
-    const lines = value.split('\n');
-    const position = lines.slice(0, index).join('\n').length;
-    editorElement.focus();
-    editorElement.setSelectionRange(position, position);
-    
-    const lineHeight = parseFloat(getComputedStyle(editorElement).lineHeight);
-    editorElement.scrollTop = index * lineHeight;
-  }
 </script>
 
 <div class="h-screen w-screen overflow-hidden bg-white p-4 flex flex-col">
@@ -84,7 +85,7 @@
     on:input={handleInput}
     on:keydown={handleKeyDown}
     class="flex-grow w-full resize-none border-none outline-none py-1 overflow-y-auto"
-    placeholder="..."
+    placeholder="Type here..."
   ></textarea>
 </div>
 

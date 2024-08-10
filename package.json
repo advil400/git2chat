@@ -43,13 +43,17 @@
 	},
 	"type": "module",
 	"dependencies": {
+		"@types/ws": "^8.5.12",
 		"express": "^4.19.2",
 		"glob": "^11.0.0",
 		"quill": "^2.0.2",
 		"rimraf": "^6.0.1",
+		"socket.io": "^4.7.5",
 		"socket.io-client": "^4.7.5",
 		"uuid": "^10.0.0",
+		"ws": "^8.18.0",
 		"y-indexeddb": "^9.0.12",
+		"y-websocket": "^2.0.4",
 		"yjs": "^13.6.18"
 	}
 }
