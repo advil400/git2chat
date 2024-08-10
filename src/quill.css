@@ -1,0 +1,5 @@
+/* Import only the necessary Quill styles */
+@import 'quill/dist/quill.core.css';
+@import 'quill/dist/quill.snow.css';
+
+/* You can add any custom Quill styles here */
