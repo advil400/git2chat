@@ -4,60 +4,56 @@
 
   export let value = '';
 
-  let lines: string[] = [''];
-  let activeLineIndex = 0;
-  let textareas: HTMLTextAreaElement[] = [];
+  let editorElement: HTMLTextAreaElement;
+  let lines: string[] = [];
 
   onMount(() => {
-    lines = value.split('\n');
-    if (lines.length === 0) lines = [''];
-    lines.push(''); // Always have an empty line at the end
+    if (value) {
+      lines = value.split('\n');
+    } else {
+      lines = [''];
+    }
+    value = lines.join('\n');
+    adjustTextareaHeight();
   });
 
-  function handleInput(event: Event, index: number) {
-    const target = event.target as HTMLTextAreaElement;
-    lines[index] = target.value;
-    value = lines.join('\n');
+  function handleInput() {
+    lines = value.split('\n');
+    adjustTextareaHeight();
+  }
 
-    // Adjust textarea height
-    target.style.height = 'auto';
-    target.style.height = target.scrollHeight + 'px';
-
-    // Add new line if we're at the last line and it's not empty
-    if (index === lines.length - 1 && lines[index].trim() !== '') {
-      lines = [...lines, ''];
+  function handleKeyDown(event: KeyboardEvent) {
+    if (event.key === 'Enter') {
+      const cursorPosition = editorElement.selectionStart;
+      const currentLineIndex = value.substr(0, cursorPosition).split('\n').length - 1;
+      
+      // Ensure there's always an empty line at the end
+      if (currentLineIndex === lines.length - 1 && lines[currentLineIndex].trim() !== '') {
+        setTimeout(() => {
+          value += '\n';
+          editorElement.setSelectionRange(cursorPosition + 1, cursorPosition + 1);
+        }, 0);
+      }
     }
   }
 
-  function handleKeyDown(event: KeyboardEvent, index: number) {
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      const target = event.target as HTMLTextAreaElement;
-      const cursorPosition = target.selectionStart;
-      const currentLine = lines[index];
-      
-      lines[index] = currentLine.slice(0, cursorPosition);
-      lines.splice(index + 1, 0, currentLine.slice(cursorPosition));
-      
-      activeLineIndex = index + 1;
-      setTimeout(() => {
-        textareas[activeLineIndex]?.focus();
-        textareas[activeLineIndex].selectionStart = textareas[activeLineIndex].selectionEnd = 0;
-      }, 0);
-    }
+  function adjustTextareaHeight() {
+    editorElement.style.height = 'auto';
+    editorElement.style.height = editorElement.scrollHeight + 'px';
   }
 
   function applyStyle(style: 'bold' | 'italic') {
-    const activeTextarea = textareas[activeLineIndex];
-    if (activeTextarea) {
-      const start = activeTextarea.selectionStart;
-      const end = activeTextarea.selectionEnd;
-      const selectedText = activeTextarea.value.substring(start, end);
-      const styledText = style === 'bold' ? `**${selectedText}**` : `*${selectedText}*`;
-      
-      activeTextarea.setRangeText(styledText, start, end, 'select');
-      handleInput({ target: activeTextarea } as any, activeLineIndex);
-    }
+    const start = editorElement.selectionStart;
+    const end = editorElement.selectionEnd;
+    const selectedText = value.substring(start, end);
+    const styledText = style === 'bold' ? `**${selectedText}**` : `*${selectedText}*`;
+    
+    value = value.substring(0, start) + styledText + value.substring(end);
+    
+    setTimeout(() => {
+      editorElement.focus();
+      editorElement.setSelectionRange(start, end + 2);
+    }, 0);
   }
 
   function saveDocument() {
@@ -69,21 +65,27 @@
     a.click();
     URL.revokeObjectURL(url);
   }
+
+  function scrollToLine(index: number) {
+    const lines = value.split('\n');
+    const position = lines.slice(0, index).join('\n').length;
+    editorElement.focus();
+    editorElement.setSelectionRange(position, position);
+    
+    const lineHeight = parseFloat(getComputedStyle(editorElement).lineHeight);
+    editorElement.scrollTop = index * lineHeight;
+  }
 </script>
 
-<div class="h-screen w-screen overflow-y-auto bg-white p-4">
-  {#each lines as line, index (index)}
-    <textarea
-      bind:this={textareas[index]}
-      value={line}
-      on:input={(event) => handleInput(event, index)}
-      on:keydown={(event) => handleKeyDown(event, index)}
-      on:focus={() => activeLineIndex = index}
-      rows="1"
-      class="w-full resize-none overflow-hidden border-none outline-none py-1"
-      placeholder={index === lines.length - 1 ? "Type here..." : ""}
-    ></textarea>
-  {/each}
+<div class="h-screen w-screen overflow-hidden bg-white p-4 flex flex-col">
+  <textarea
+    bind:this={editorElement}
+    bind:value
+    on:input={handleInput}
+    on:keydown={handleKeyDown}
+    class="flex-grow w-full resize-none border-none outline-none py-1 overflow-y-auto"
+    placeholder="..."
+  ></textarea>
 </div>
 
 <FloatingToolbar {applyStyle} {saveDocument} />
@@ -97,6 +99,6 @@
   textarea {
     font-family: inherit;
     font-size: inherit;
-    line-height: inherit;
+    line-height: 1.5;
   }
 </style>
